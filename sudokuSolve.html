@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sudoku Game</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 30px;
+      background: #f7f7f7;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    #controls, #status, #timer {
+      margin-top: 10px;
+      font-size: 1.2rem;
+    }
+
+    #sudoku-board {
+      display: grid;
+      grid-template-columns: repeat(9, 40px);
+      grid-template-rows: repeat(9, 40px);
+      gap: 1px;
+      margin-top: 15px;
+    }
+
+    input.cell {
+      width: 40px;
+      height: 40px;
+      text-align: center;
+      font-size: 1.2rem;
+      border: 1px solid #ccc;
+      background-color: white;
+    }
+
+    input.cell.fixed {
+      background-color: #eee;
+      font-weight: bold;
+      pointer-events: none;
+    }
+
+    input.cell.invalid {
+      background-color: #ffcccc;
+    }
+
+    .cell:focus {
+      outline: 2px solid #00b4d8;
+    }
+
+    button {
+      padding: 8px 16px;
+      margin: 5px;
+    }
+
+    #timer {
+      font-weight: bold;
+    }
+
+    #menu {
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Sudoku Game</h1>
+
+  <div id="menu">
+    <button onclick="startGame(true)">Play Timed ⏱️</button>
+    <button onclick="startGame(false)">Play Untimed 🙂</button>
+  </div>
+
+  <div id="timer" style="display: none;"></div>
+  <div id="sudoku-board"></div>
+  <div id="status"></div>
+  <div id="controls" style="display:none;">
+    <button onclick="generateSudoku()">Restart</button>
+  </div>
+
+  <script>
+    const boardElement = document.getElementById("sudoku-board");
+    const status = document.getElementById("status");
+    const timerDisplay = document.getElementById("timer");
+    const controls = document.getElementById("controls");
+    const menu = document.getElementById("menu");
+
+    let solutionBoard = [];
+    let timer = null;
+    let startTime = 0;
+
+    function startGame(isTimed) {
+      menu.style.display = "none";
+      controls.style.display = "block";
+      if (isTimed) {
+        startTime = Date.now();
+        timerDisplay.style.display = "block";
+        timer = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          const mins = String(Math.floor(elapsed / 60)).padStart(2, "0");
+          const secs = String(elapsed % 60).padStart(2, "0");
+          timerDisplay.textContent = `Time: ${mins}:${secs}`;
+        }, 1000);
+      }
+      generateSudoku();
+    }
+
+    function generateSudoku() {
+      boardElement.innerHTML = "";
+      status.textContent = "";
+      const fullBoard = generateSolvedBoard();
+      solutionBoard = fullBoard.map(row => row.slice());
+      const puzzleBoard = removeCells(fullBoard, 40);
+
+      for (let i = 0; i < 81; i++) {
+        const row = Math.floor(i / 9);
+        const col = i % 9;
+        const cell = document.createElement("input");
+        cell.setAttribute("type", "text");
+        cell.classList.add("cell");
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.dataset.index = i;
+
+        
+        
+        if (puzzleBoard[row][col] !== 0) {
+  cell.value = puzzleBoard[row][col];
+  cell.classList.add("fixed");
+  cell.readOnly = true; // This is the KEY line
+} else {
+  cell.addEventListener("input", () => validateInput(cell, row, col));
+  cell.addEventListener("keydown", handleArrowKeys);
+}
+
+        
+        
+
+        boardElement.appendChild(cell);
+      }
+
+      // Focus first empty cell
+      setTimeout(() => {
+        const firstEmpty = [...document.querySelectorAll("input.cell:not(.fixed)")][0];
+        if (firstEmpty) firstEmpty.focus();
+      }, 100);
+    }
+
+    function handleArrowKeys(e) {
+      const key = e.key;
+      const current = e.target;
+      const index = parseInt(current.dataset.index);
+      let newIndex;
+
+      switch (key) {
+        case "ArrowUp":
+          newIndex = index - 9; break;
+        case "ArrowDown":
+          newIndex = index + 9; break;
+        case "ArrowLeft":
+          newIndex = index - 1; break;
+        case "ArrowRight":
+          newIndex = index + 1; break;
+        default:
+          return;
+      }
+
+      e.preventDefault();
+      const target = document.querySelector(`input.cell[data-index='${newIndex}']:not(.fixed)`);
+      if (target) target.focus();
+    }
+
+    function validateInput(cell, row, col) {
+      const value = cell.value;
+      const number = parseInt(value);
+      if (isNaN(number) || number < 1 || number > 9) {
+        cell.classList.add("invalid");
+        return;
+      }
+
+      const inputs = document.querySelectorAll("input.cell");
+      const board = Array.from({ length: 9 }, (_, r) =>
+        Array.from({ length: 9 }, (_, c) =>
+          parseInt(inputs[r * 9 + c].value) || 0
+        )
+      );
+
+      if (isValidMove(board, row, col, number)) {
+        cell.classList.remove("invalid");
+        checkWin(board);
+      } else {
+        cell.classList.add("invalid");
+      }
+    }
+
+    function checkWin(board) {
+      const isFull = board.every(row => row.every(cell => cell !== 0));
+      if (!isFull) return;
+
+      const flatBoard = board.flat();
+      const flatSolution = solutionBoard.flat();
+
+      const isCorrect = flatBoard.every((num, i) => num === flatSolution[i]);
+      if (isCorrect) {
+        status.textContent = "🎉 You solved it!";
+        if (timer) clearInterval(timer);
+      }
+    }
+
+    function isValidMove(board, row, col, num) {
+      for (let i = 0; i < 9; i++) {
+        if (i !== col && board[row][i] === num) return false;
+        if (i !== row && board[i][col] === num) return false;
+      }
+      const startRow = row - row % 3;
+      const startCol = col - col % 3;
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const i = startRow + r;
+          const j = startCol + c;
+          if ((i !== row || j !== col) && board[i][j] === num) return false;
+        }
+      }
+      return true;
+    }
+
+    function generateSolvedBoard() {
+      const board = Array.from({ length: 9 }, () => Array(9).fill(0));
+
+      function isSafe(row, col, num) {
+        for (let i = 0; i < 9; i++) {
+          if (board[row][i] === num || board[i][col] === num) return false;
+        }
+        const startRow = row - row % 3;
+        const startCol = col - col % 3;
+        for (let r = 0; r < 3; r++) {
+          for (let c = 0; c < 3; c++) {
+            if (board[startRow + r][startCol + c] === num) return false;
+          }
+        }
+        return true;
+      }
+
+      function fillBoard(pos = 0) {
+        if (pos >= 81) return true;
+        const row = Math.floor(pos / 9);
+        const col = pos % 9;
+        const numbers = shuffle([1,2,3,4,5,6,7,8,9]);
+
+        for (let num of numbers) {
+          if (isSafe(row, col, num)) {
+            board[row][col] = num;
+            if (fillBoard(pos + 1)) return true;
+            board[row][col] = 0;
+          }
+        }
+        return false;
+      }
+
+      fillBoard();
+      return board;
+    }
+
+    function removeCells(board, count) {
+      const newBoard = board.map(row => row.slice());
+      let removed = 0;
+      while (removed < count) {
+        const i = Math.floor(Math.random() * 9);
+        const j = Math.floor(Math.random() * 9);
+        if (newBoard[i][j] !== 0) {
+          newBoard[i][j] = 0;
+          removed++;
+        }
+      }
+      return newBoard;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+  </script>
+</body>
+</html>
+
