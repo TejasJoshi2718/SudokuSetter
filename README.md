@@ -29,7 +29,7 @@ A fully functional Sudoku puzzle game built with HTML, CSS, and vanilla JavaScri
    git clone https://github.com/yourusername/sudoku-game.git
    cd sudoku-game
    ```
-2. Open `index.html` in your browser.
+2. Open `sudokuSolve.html` in your browser.
 
 ---
 
